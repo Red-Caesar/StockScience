@@ -74,3 +74,7 @@ def get_portfolio_std(
         portfolio_var = np.matmul(np.matmul(ratios, cov_matrix), ratios)
 
     return np.sqrt(portfolio_var)
+
+
+def get_VaR(returns: pd.Series, gamma: float=0.9) -> float:
+    return (-returns).quantile(gamma)

@@ -78,3 +78,20 @@ def get_portfolio_std(
 
 def get_VaR(returns: pd.Series, gamma: float=0.9) -> float:
     return (-returns).quantile(gamma)
+
+
+def get_df_with_mean_std_return(df: pd.DataFrame,
+    stocks_id: str="SECID",
+    stock_return: str="RETURN",
+    ) -> pd.DataFrame:
+    
+    tickers = df[stocks_id].unique()
+    df["MEAN_RETURN"] = 0.0
+    df["STD_RETURN"] = 0.0
+
+    for ticker in tickers:
+        ticker_window = (df.SECID == ticker)
+        df.loc[ticker_window, "MEAN_RETURN"] = df.loc[ticker_window, stock_return].mean()
+        df.loc[ticker_window, "STD_RETURN"] = df.loc[ticker_window, stock_return].std()
+    
+    return df

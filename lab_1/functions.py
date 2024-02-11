@@ -2,6 +2,7 @@ from typing import Any, List, Union, Dict
 import pandas as pd
 import numpy as np
 from functools import reduce
+from scipy import stats
 
 
 def get_df_with_return(
@@ -95,3 +96,59 @@ def get_df_with_mean_std_return(df: pd.DataFrame,
         df.loc[ticker_window, "STD_RETURN"] = df.loc[ticker_window, stock_return].std()
     
     return df
+
+def get_stock_name(
+    df: pd.DataFrame,
+    stock_id: str,
+    stocks_id_col: str="SECID",
+    stocks_name_col: str="SHORTNAME"
+) -> str:
+    stock_name = df[df[stocks_id_col] == stock_id][stocks_name_col].unique()[0]
+    return stock_name
+
+
+def inversion_test(
+    df: pd.DataFrame,
+    companies: Union[List[str], pd.Series],
+    target_col: str="RETURN",
+    stocks_id_col: str="SECID",
+    alpha: float=0.05
+) -> pd.DataFrame:
+
+    result_dict = {stocks_id_col: [], "hypothesis": []}
+    for companie in companies:
+        inv_count = 0
+        data = df[df[stocks_id_col] == companie][target_col].tolist()
+        n = len(data)
+        for i in range(n - 1):
+            for j in range(i + 1, n):
+                if data[i] > data[j]:
+                    inv_count += 1
+        e = (n * (n - 1)) / 4
+        t_alpha = -stats.norm.ppf(alpha/2) * n**(3/2)/6
+        result_dict[stocks_id_col].append(companie)
+        if abs(inv_count - e) >= t_alpha:
+            result_dict["hypothesis"].append("rejected")
+        else:
+            result_dict["hypothesis"].append("accepted")
+    return pd.DataFrame(result_dict)
+
+
+def autocorrelation_test(
+    returns: pd.Series,
+    alpha: float=0.05,
+    shift: int=1,
+) -> dict:
+    N = len(returns)
+    shift_returns = np.roll(returns, shift)
+    numerator = N * np.sum(list(map(lambda x,y: x*y, returns, shift_returns))) - np.power(sum(returns), 2)
+    denominator = N * np.sum(list(map(lambda x: x*x, returns))) - np.power(np.sum(returns), 2)
+    coef_cor = numerator / denominator
+
+    e = - 1 / (N-1)
+    d = N * (N - 3) / ((N + 1) * np.power(N - 1, 2))
+
+    cr = abs(coef_cor - e) / np.sqrt(d)
+    q = stats.norm.ppf(1 - alpha/2)
+    isTrend = cr > q
+    return {'coef_criteria': cr, "trend": isTrend}

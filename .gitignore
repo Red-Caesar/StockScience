@@ -1,1 +1,5 @@
 */install_logs.txt
+!contest
+contest/*
+!contest/README.md
+!contest/img

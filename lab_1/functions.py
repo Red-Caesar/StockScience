@@ -157,3 +157,16 @@ def autocorrelation_test(
     q = stats.norm.ppf(1 - alpha/2)
     isTrend = cr > q
     return {'coef_criteria': cr, "trend": isTrend}
+
+
+def generate_short_ratios(n: int) -> List:
+    
+    random_numbers = np.random.rand(n)
+    diff = [1 - abs(q) for q in random_numbers]
+    
+    total_diff = sum(diff)
+    needed = 1.0 - sum(random_numbers)
+    
+    adjust = [q * needed / total_diff for q in diff]
+    new = [random_numbers[i] + adjust[i] for i in range(len(random_numbers))]
+    return new

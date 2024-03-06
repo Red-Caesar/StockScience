@@ -2,3 +2,4 @@ pandas
 missingno
 plotly
 statsmodels
+cvxpy

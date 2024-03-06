@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from functools import reduce
 from scipy import stats
+import cvxpy as cp
 
 
 def get_df_with_return(
@@ -160,13 +161,45 @@ def autocorrelation_test(
 
 
 def generate_short_ratios(n: int) -> List:
-    
+
     random_numbers = np.random.rand(n)
     diff = [1 - abs(q) for q in random_numbers]
-    
+
     total_diff = sum(diff)
     needed = 1.0 - sum(random_numbers)
-    
+
     adjust = [q * needed / total_diff for q in diff]
     new = [random_numbers[i] + adjust[i] for i in range(len(random_numbers))]
     return new
+
+
+def solve_risk_aversion(
+    mu: List[float],
+    sigma: List[List[float]],
+    aversion_value: int=1,
+    with_short: bool=False
+    ) -> Dict[str, float]:
+    n = len(mu)
+    w = cp.Variable(n)
+    risk_aversion = cp.Parameter(nonneg=True)
+    risk_aversion.value = aversion_value
+
+    ret = mu.T @ w
+    risk = cp.quad_form(w, sigma)
+
+    objective = cp.Maximize(ret - risk_aversion * risk)
+    if with_short:
+        constraints = [cp.sum(w) == 1]
+    else:
+        constraints = [cp.sum(w) == 1, w >= 0.01]
+
+    prob = cp.Problem(objective, constraints)
+
+    prob.solve()
+    solution = {
+        "weights": w.value,
+        "risk": np.sqrt(risk.value),
+        "expected_return": ret.value,
+        "risk_aversion": aversion_value
+    }
+    return solution

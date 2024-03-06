@@ -1,9 +1,9 @@
 from typing import Any, List, Union, Dict
 import pandas as pd
 import numpy as np
-from functools import reduce
 from scipy import stats
 import cvxpy as cp
+from scipy.optimize import minimize, Bounds
 
 
 def get_df_with_return(
@@ -231,3 +231,30 @@ def get_random_portfolios(
             random_portfolio_dict["type"].append("not_short_sales")
 
     return pd.DataFrame(random_portfolio_dict)
+
+
+def ret_risk(w, exp_return, cov):
+    return -((w.T@exp_return) / (w.T@cov@w)**0.5)
+
+
+def solve_markowitz(data: pd.DataFrame, with_short: bool=False) -> pd.DataFrame:
+    w = np.ones((data.values.T.shape[0],1))*(1.0/data.values.T.shape[0])
+    m = np.mean(data.values.T, axis=1)
+    demeaned = data.values.T - m[:,None]
+    m = m.reshape(m.shape[0],1)
+    exp_return = m*w
+    cov = np.cov(demeaned)
+    if with_short:
+        opt_bounds = Bounds(-1, 1)
+    else:
+        opt_bounds = Bounds(0, 1)
+    opt_constraints = ({'type': 'eq', 'fun': lambda w: 1.0 - np.sum(w)})
+    res = minimize(
+        ret_risk,
+        w,
+        args=(exp_return, cov),
+        method='SLSQP',
+        bounds=opt_bounds,
+        constraints=opt_constraints)
+    result_df = pd.DataFrame({"weights": res.x}, index=data.columns)
+    return result_df

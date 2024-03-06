@@ -68,11 +68,16 @@ def get_portfolio_std(
         stock_returns = df[df[stocks_id_col] == stock].sort_values(by=date_col)[return_col].to_list()
         new_df[stock] = stock_returns
     new_df = pd.DataFrame(new_df)
+    new_df = new_df.sort_index(axis=1)
     cov_matrix = new_df.cov()
 
     portfolio_var = 0
     if isinstance(ratios, list):
         portfolio_var = np.matmul(np.matmul(ratios, cov_matrix), ratios)
+    elif isinstance(ratios, dict):
+        sorted_ratio = sorted(ratios.items(), key=lambda x: x[0])
+        sorted_ratio = [x[1] for x in sorted_ratio]
+        portfolio_var = np.matmul(np.matmul(sorted_ratio, cov_matrix), sorted_ratio)
 
     return np.sqrt(portfolio_var)
 
@@ -85,7 +90,7 @@ def get_df_with_mean_std_return(df: pd.DataFrame,
     stocks_id: str="SECID",
     stock_return: str="RETURN",
     ) -> pd.DataFrame:
-    
+
     tickers = df[stocks_id].unique()
     df["MEAN_RETURN"] = 0.0
     df["STD_RETURN"] = 0.0
@@ -94,7 +99,7 @@ def get_df_with_mean_std_return(df: pd.DataFrame,
         ticker_window = (df.SECID == ticker)
         df.loc[ticker_window, "MEAN_RETURN"] = df.loc[ticker_window, stock_return].mean()
         df.loc[ticker_window, "STD_RETURN"] = df.loc[ticker_window, stock_return].std()
-    
+
     return df
 
 def get_stock_name(

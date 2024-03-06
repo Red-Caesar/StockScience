@@ -203,3 +203,31 @@ def solve_risk_aversion(
         "risk_aversion": aversion_value
     }
     return solution
+
+
+def get_random_portfolios(
+    df: pd.DataFrame,
+    with_short: bool=False,
+    random_samples: int=10
+) -> pd.DataFrame:
+    n = df.SECID.nunique()
+
+    random_portfolio_dict = {"mean": [], "std": [], "type": []}
+    for _ in range(random_samples):
+        if with_short:
+            ratios = generate_short_ratios(n)
+        else:
+            ratios = np.random.dirichlet(np.ones(n)).tolist()
+
+        weight = pd.DataFrame({"weights":ratios}, index=list(df.SECID.unique()))
+        ex_return = get_portfolio_expected_return(df, weight.to_dict()["weights"])
+        ex_std = get_portfolio_std(df, ratios)
+
+        random_portfolio_dict["mean"].append(ex_return)
+        random_portfolio_dict["std"].append(ex_std)
+        if with_short:
+            random_portfolio_dict["type"].append("with_short_sales")
+        else:
+            random_portfolio_dict["type"].append("not_short_sales")
+
+    return pd.DataFrame(random_portfolio_dict)

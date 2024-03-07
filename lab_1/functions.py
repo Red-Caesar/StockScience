@@ -4,6 +4,8 @@ import numpy as np
 from scipy import stats
 import cvxpy as cp
 from scipy.optimize import minimize, Bounds
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def get_df_with_return(
@@ -258,3 +260,81 @@ def solve_markowitz(data: pd.DataFrame, with_short: bool=False) -> pd.DataFrame:
         constraints=opt_constraints)
     result_df = pd.DataFrame({"weights": res.x}, index=data.columns)
     return result_df
+
+
+def minimize_portfolio(objective, mean_returns, covar_matrix, bounds, target_return=None):
+    X = np.ones(mean_returns.shape[0])
+    X = X / X.sum()
+    bounds = bounds * mean_returns.shape[0]
+    
+    constraints = []
+    constraints.append({'type':'eq', 'fun': lambda X: np.sum(X) - 1.0})
+    if target_return:
+        constraints.append({'type':'eq', 'args' : (mean_returns, ), 'fun': lambda X, mean_returns: target_return - np.dot(X, mean_returns)})
+        
+    return minimize(objective, X, args=(covar_matrix), method='SLSQP', constraints=constraints, bounds=bounds).x
+
+
+def get_portfolio_risk(X, covar_matrix):
+    return np.sqrt(np.dot(np.dot(X.T, covar_matrix), X))
+
+
+def calculate_efficient_frontier(chosen_stock_returns, chosen_stock_characteristics, short_sales = True):
+    bounds = ()
+    if short_sales:
+      bounds = ((-1.0, 1.0), ) # Short sales are allowed
+    else:
+      bounds = ((0.0, 1.0), ) # Short sales are forbidden
+
+    cov_matrix = chosen_stock_returns.cov()
+    
+    min_risk_portfolio = minimize_portfolio(get_portfolio_risk,
+                                        chosen_stock_characteristics.MEAN_RETURN,
+                                        cov_matrix,
+                                        bounds
+                                        )
+    
+    min_risk_portfolio_std = get_portfolio_risk(min_risk_portfolio, cov_matrix)
+    min_risk_portfolio_return = np.dot(min_risk_portfolio, chosen_stock_characteristics.MEAN_RETURN)
+    
+    
+    target_range = np.linspace(min_risk_portfolio_return, chosen_stock_characteristics.STD_RETURN.max() + 0.003, 300)
+    
+    portfolio_stds = []
+    portfolio_returns = []
+    for portfolio_return in target_range:
+        x = minimize_portfolio(get_portfolio_risk,
+                                chosen_stock_characteristics.MEAN_RETURN,
+                                cov_matrix,
+                                bounds,
+                                target_return=portfolio_return)
+        portfolio_returns.append(np.dot(x, chosen_stock_characteristics.MEAN_RETURN))
+        portfolio_stds.append(get_portfolio_risk(x, cov_matrix))
+        
+    return min_risk_portfolio_std, min_risk_portfolio_return, portfolio_stds, portfolio_returns
+
+
+def plot_efficient_frontier(chosen_stock_characteristics, 
+                            min_risk_portfolio_std, 
+                            min_risk_portfolio_return, 
+                            portfolio_stds, 
+                            portfolio_returns, 
+                            short_sales, 
+                            color='red', 
+                            num = 10):
+
+    if short_sales:
+        mes_short_sales = 'allowed short sales'
+    else:
+        mes_short_sales = 'forbidden short sales'
+    
+    sns.scatterplot(x=chosen_stock_characteristics.STD_RETURN,
+        y=chosen_stock_characteristics.MEAN_RETURN, color='dodgerblue')
+
+    sns.scatterplot(x=[min_risk_portfolio_std], y=[min_risk_portfolio_return], marker='.', s=500, label=f'Min. risk portfolio, {mes_short_sales}', color=color)
+
+    sns.lineplot(x=portfolio_stds, y=portfolio_returns, label=f'Efficient frontier of {num}, {mes_short_sales}', color=color)
+
+    plt.legend()
+    plt.ylabel('Expected return')
+    plt.xlabel('Standard deviation')
